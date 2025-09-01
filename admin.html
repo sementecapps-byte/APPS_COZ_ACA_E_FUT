@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Administrador</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-gray-200">
+    <div id="root" class="container mx-auto p-4"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- Configuração do Supabase ---
+        // COLE AS MESMAS CREDENCIAIS DO SUPABASE ABAIXO
+        const SUPABASE_URL = 'SUA_URL_DO_SUPABASE'; 
+        const SUPABASE_ANON_KEY = 'SUA_CHAVE_ANON_PUBLICA';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const ADMIN_PASSWORD = "123";
+
+        function AdminPanel() {
+            const [listas, setListas] = useState([]);
+            const [produtos, setProdutos] = useState([]);
+            const [error, setError] = useState(null);
+            
+            const [novoNome, setNovoNome] = useState('');
+            const [novaImagem, setNovaImagem] = useState('');
+            const [novaCategoria, setNovaCategoria] = useState('');
+
+            useEffect(() => {
+                const fetchData = async () => {
+                    // Verifique se o usuário está logado antes de buscar dados
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!user) {
+                        setError("Você precisa estar logado no site principal com sua conta de administrador para ver esta página.");
+                        return;
+                    }
+                    fetchListas();
+                    fetchProdutos();
+                };
+                fetchData();
+            }, []);
+
+            const fetchListas = async () => {
+                const { data, error } = await supabase.from('listas_de_compras').select('*, user_id(*)').order('created_at', { ascending: false });
+                if (error) {
+                  console.error("Erro ao buscar listas:", error);
+                  setError("Falha ao buscar listas. Verifique se sua conta tem permissão de administrador nas políticas do Supabase.");
+                } else setListas(data);
+            };
+            
+            const fetchProdutos = async () => {
+                const { data, error } = await supabase.from('produtos').select('*').order('nome');
+                if (error) console.error("Erro ao buscar produtos:", error);
+                else setProdutos(data);
+            };
+            
+            const handleAddProduto = async (e) => {
+                e.preventDefault();
+                if (!novoNome || !novaCategoria) {
+                    alert('Nome e Categoria são obrigatórios.');
+                    return;
+                }
+                const { data, error } = await supabase.from('produtos').insert([{
+                    nome: novoNome,
+                    imagem: novaImagem,
+                    categoria: novaCategoria.toUpperCase()
+                }]);
+                if (error) {
+                    alert("Erro ao adicionar produto: " + error.message);
+                } else {
+                    alert("Produto adicionado com sucesso!");
+                    setNovoNome(''); setNovaImagem(''); setNovaCategoria('');
+                    fetchProdutos();
+                }
+            };
+
+            const exportXLS = () => { /* ... (código de exportação sem alteração) ... */ };
+            const exportPDF = () => { /* ... (código de exportação sem alteração) ... */ };
+
+            if(error) return <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p>{error}</p></div>;
+
+            return (
+                <div className="bg-white p-6 rounded-lg shadow-lg">
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-3xl font-bold">Painel do Administrador</h1>
+                        <a href="/index.html" className="text-blue-600">Voltar ao site</a>
+                    </div>
+                    
+                    {/* Seção de Gerenciar Produtos */}
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold mb-4">Gerenciar Produtos</h2>
+                        <form onSubmit={handleAddProduto} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-md bg-gray-50">
+                            <input value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Nome do Produto" className="p-2 border rounded" required/>
+                            <input value={novaImagem} onChange={e => setNovaImagem(e.target.value)} placeholder="URL da Imagem" className="p-2 border rounded" />
+                            <input value={novaCategoria} onChange={e => setNovaCategoria(e.target.value)} placeholder="Categoria" className="p-2 border rounded" required/>
+                            <button type="submit" className="bg-blue-600 text-white p-2 rounded font-bold hover:bg-blue-700">Adicionar Produto</button>
+                        </form>
+                        <div className="mt-4 max-h-60 overflow-y-auto border p-2 rounded"><ul className="list-disc pl-5">
+                            {produtos.map(p => <li key={p.id}>{p.nome} ({p.categoria})</li>)}
+                        </ul></div>
+                    </div>
+
+                    {/* Seção de Listas de Compras */}
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-2xl font-semibold">Listas de Compras Recebidas</h2>
+                            {/* Os botões de exportar podem ser adicionados aqui se desejar */}
+                        </div>
+                        <div className="space-y-4">{listas.map(lista => (
+                            <div key={lista.id} className="p-4 border rounded-md">
+                                <p className="font-bold">Recebido em: <span className="font-normal">{new Date(lista.created_at).toLocaleString('pt-BR')}</span></p>
+                                <ul className="list-disc pl-5 mt-2">{lista.items.map((item, idx) => (
+                                    <li key={idx}>{item.quantidade} {item.unidade} - {item.nome}</li>
+                                ))}</ul>
+                            </div>
+                        ))}</div>
+                    </div>
+                </div>
+            );
+        }
+
+        function PasswordScreen({ onCorrectPassword }) {
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState(false);
+
+            const checkPassword = (e) => {
+                e.preventDefault();
+                if (password === ADMIN_PASSWORD) onCorrectPassword();
+                else setError(true);
+            };
+            
+            return (
+                <div className="flex justify-center items-center h-screen">
+                    <form onSubmit={checkPassword} className="bg-white p-8 rounded-lg shadow-md">
+                        <h2 className="text-xl font-bold mb-4">Acesso Restrito</h2>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Digite a senha" className="w-full p-2 border rounded-md"/>
+                        {error && <p className="text-red-500 text-sm mt-2">Senha incorreta.</p>}
+                        <button type="submit" className="w-full mt-4 bg-blue-600 text-white p-2 rounded-md font-bold">Entrar</button>
+                    </form>
+                </div>
+            );
+        }
+
+        function App() {
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            if (isLoggedIn) return <AdminPanel />;
+            return <PasswordScreen onCorrectPassword={() => setIsLoggedIn(true)} />;
+        }
+
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+</body>
+</html>
