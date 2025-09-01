@@ -17,10 +17,10 @@
         const { useState, useEffect } = React;
 
         // --- Configuração do Supabase ---
-        // COLE SUAS CREDENCIAIS DO SUPABASE ABAIXO
-        const SUPABASE_URL = 'SUA_URL_DO_SUPABASE'; 
-        const SUPABASE_ANON_KEY = 'SUA_CHAVE_ANON_PUBLICA'; 
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const SUPABASE_URL = 'https://uorihlxkjhckhcjktmme.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvcmlobHhramhja2hjamt0bW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0MTAwMzksImV4cCI6MjA3MTk4NjAzOX0.wRpAaIZZRiYICLcTpXdUC3TJtcarPymlkfOxt00P29M'; 
+        const { createClient } = supabase;
+        const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function Auth({ onLogin }) {
             const [email, setEmail] = useState('');
@@ -33,11 +33,10 @@
                 setMessage('');
                 try {
                     let { data, error } = isLogin 
-                        ? await supabase.auth.signInWithPassword({ email, password })
-                        : await supabase.auth.signUp({ email, password });
+                        ? await supa.auth.signInWithPassword({ email, password })
+                        : await supa.auth.signUp({ email, password });
 
                     if (error) throw error;
-                    // O onAuthStateChange cuidará de setar o usuário
                 } catch (error) {
                     setMessage(error.message);
                 }
@@ -87,7 +86,7 @@
 
             useEffect(() => {
                 const fetchProdutos = async () => {
-                    const { data, error } = await supabase.from('produtos').select('*');
+                    const { data, error } = await supa.from('produtos').select('*');
                     if (error) {
                         console.error('Erro ao buscar produtos:', error);
                     } else {
@@ -126,17 +125,17 @@
                     return;
                 }
 
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user } } = await supa.auth.getUser();
 
                 if (!user) {
                     alert("Você precisa estar logado para enviar uma lista.");
                     return;
                 }
                 
-                const { data, error } = await supabase
+                const { error } = await supa
                     .from('listas_de_compras')
                     .insert([{ 
-                        user_id: user.id, // Inserindo o ID do usuário (seguro)
+                        user_id: user.id,
                         items: sacola 
                     }]);
 
@@ -185,7 +184,7 @@
                             </div>
 
                             <div className="mb-4 flex flex-col gap-1">
-                                {buscaAtiva && sugeridos.map((p, i) => (
+                                {buscaAtiva && sugeridos.map((p) => (
                                     <div key={p.id} className="cursor-pointer flex items-center gap-2 p-2 bg-white rounded shadow" onClick={() => setPopupItem(p)}>
                                         <img src={p.imagem || 'https://via.placeholder.com/50'} className="w-10 h-10 sm:w-12 sm:h-12 object-cover" /> {p.nome}
                                     </div>
@@ -278,18 +277,18 @@
 
             useEffect(() => {
                 const checkUser = async () => {
-                    const { data: { session } } = await supabase.auth.getSession();
+                    const { data: { session } } = await supa.auth.getSession();
                     setUser(session?.user ?? null);
                 };
                 checkUser();
-                const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+                const { data: { subscription } } = supa.auth.onAuthStateChange((_event, session) => {
                     setUser(session?.user ?? null);
                 });
                 return () => subscription.unsubscribe();
             }, []);
 
             const handleLogout = async () => {
-                await supabase.auth.signOut();
+                await supa.auth.signOut();
                 setUser(null);
             };
 
